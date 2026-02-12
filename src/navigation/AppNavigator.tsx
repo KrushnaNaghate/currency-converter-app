@@ -1,35 +1,27 @@
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import React from "react";
-import HistoryScreen from "../screens/HistoryScreen";
-import MainScreen from "../screens/MainScreen";
+import { HistoryScreen } from "../screens/HistoryScreen";
+import { MainScreen } from "../screens/MainScreen";
 
-const Stack = createNativeStackNavigator();
+export type RootStackParamList = {
+  Main: undefined;
+  History: undefined;
+};
 
-const AppNavigator = () => {
+const Stack = createNativeStackNavigator<RootStackParamList>();
+
+const AppNavigator: React.FC = () => {
   return (
     <NavigationContainer>
       <Stack.Navigator
         screenOptions={{
-          headerStyle: {
-            backgroundColor: "#007AFF",
-          },
-          headerTintColor: "white",
-          headerTitleStyle: {
-            fontWeight: "bold",
-          },
+          headerShown: false,
+          animation: "slide_from_right",
         }}
       >
-        <Stack.Screen
-          name="Main"
-          component={MainScreen}
-          options={{ title: "Currency Converter" }}
-        />
-        <Stack.Screen
-          name="History"
-          component={HistoryScreen}
-          options={{ title: "History" }}
-        />
+        <Stack.Screen name="Main" component={MainScreen} />
+        <Stack.Screen name="History" component={HistoryScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

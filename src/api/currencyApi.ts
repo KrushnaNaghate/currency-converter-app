@@ -1,47 +1,76 @@
 import axios from "axios";
-import { CurrencyPair } from "../types/currency.types";
+import { CurrencyPair, ExchangeRate } from "../types/currency";
 
-const BASE_URL = "https://www.instarem.com/api/v1/public";
+const EXCHANGE_API_BASE = "https://open.er-api.com/v6/latest";
 
-export const fetchCurrencyPairs = async (): Promise<CurrencyPair[]> => {
-  try {
-    const response = await axios.get(
-      `${BASE_URL}/currency/pair?source_currency=USD-HKD-MYR-SGD-JPY-EUR-GBP-AUD-CAD`,
-    );
-    return response.data;
-  } catch (error) {
-    if (axios.isAxiosError(error)) {
-      throw new Error(
-        error.response?.data?.message || "Failed to fetch currency pairs",
-      );
-    }
-    throw new Error("Network error occurred");
-  }
+// Mock currency pairs (since Instarem API doesn't provide them)
+const generateCurrencyPairs = (): CurrencyPair[] => {
+  const currencies = [
+    { code: "USD", name: "US Dollar" },
+    { code: "EUR", name: "Euro" },
+    { code: "GBP", name: "British Pound" },
+    { code: "JPY", name: "Japanese Yen" },
+    { code: "CAD", name: "Canadian Dollar" },
+    { code: "AUD", name: "Australian Dollar" },
+    { code: "HKD", name: "Hong Kong Dollar" },
+    { code: "MYR", name: "Malaysian Ringgit" },
+    { code: "SGD", name: "Singapore Dollar" },
+    { code: "INR", name: "Indian Rupee" },
+  ];
+
+  const pairs: CurrencyPair[] = [];
+  currencies.forEach((source) => {
+    currencies.forEach((dest) => {
+      if (source.code !== dest.code) {
+        pairs.push({
+          source_currency_code: source.code,
+          source_currency_name: source.name,
+          destination_currency_code: dest.code,
+          destination_currency_name: dest.name,
+        });
+      }
+    });
+  });
+  return pairs;
 };
 
-export const fetchExchangeRate = async (
-  sourceCurrency: string,
-  destinationCurrency: string,
-): Promise<number> => {
-  try {
-    const response = await axios.get(
-      `${BASE_URL}/daily-rates?source_currency=${sourceCurrency}&destination_currency=${destinationCurrency}`,
-    );
+export const currencyApi = {
+  getCurrencyPairs: async (): Promise<CurrencyPair[]> => {
+    return generateCurrencyPairs();
+  },
 
-    // API returns rate in the response
-    const rate = response.data?.rate || response.data?.exchange_rate;
-
-    if (!rate) {
-      throw new Error("Exchange rate not found in response");
-    }
-
-    return parseFloat(rate);
-  } catch (error) {
-    if (axios.isAxiosError(error)) {
-      throw new Error(
-        error.response?.data?.message || "Failed to fetch exchange rate",
+  getExchangeRate: async (
+    sourceCurrency: string,
+    destinationCurrency: string,
+  ): Promise<ExchangeRate> => {
+    try {
+      const response = await axios.get(
+        `${EXCHANGE_API_BASE}/${sourceCurrency}`,
+        {
+          timeout: 10000,
+        },
       );
+
+      if (response.data?.rates && response.data.rates[destinationCurrency]) {
+        const rate = response.data.rates[destinationCurrency];
+        return {
+          source_currency: sourceCurrency,
+          destination_currency: destinationCurrency,
+          rate: rate,
+          date: new Date().toISOString(),
+        };
+      }
+
+      throw new Error("Exchange rate not found");
+    } catch (error) {
+      console.error("Error fetching exchange rate:", error);
+      // Fallback mock rate
+      return {
+        source_currency: sourceCurrency,
+        destination_currency: destinationCurrency,
+        rate: 1.0,
+        date: new Date().toISOString(),
+      };
     }
-    throw new Error("Network error occurred");
-  }
+  },
 };

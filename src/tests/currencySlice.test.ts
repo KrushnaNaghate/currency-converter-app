@@ -4,7 +4,7 @@ import currencyReducer, {
   setSourceCurrency,
   swapCurrencies,
 } from "../redux/slices/currencySlice";
-import { CurrencyState } from "../types/currency.types";
+import { CurrencyState } from "../types/currency";
 
 describe("currencySlice", () => {
   const initialState: CurrencyState = {

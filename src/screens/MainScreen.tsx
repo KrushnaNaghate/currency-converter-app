@@ -1,5 +1,8 @@
-import React, { useEffect, useState } from "react";
+import { MaterialIcons } from "@expo/vector-icons";
+import NetInfo from "@react-native-community/netinfo";
+import React, { useEffect } from "react";
 import {
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,339 +14,459 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from "react-native-reanimated";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useDispatch, useSelector } from "react-redux";
-import ConversionInput from "../components/ConversionInput";
-import CurrencyDropdown from "../components/CurrencyDropdown";
-import LoadingSpinner from "../components/LoadingSpinner";
+import { AmountInput } from "../components/AmountInput";
+import { ConversionResult } from "../components/ConversionResult";
+import { CurrencyDropdown } from "../components/CurrencyDropdown";
+import { ErrorView } from "../components/ErrorView";
+import { LoadingSpinner } from "../components/LoadingSpinner";
+import { OfflineBanner } from "../components/OfflineBanner";
 import {
-  checkNetworkStatus,
+  addToHistory,
+  clearConversionError,
+  fetchExchangeRate,
+  selectAmount,
+  selectConversionError,
+  selectConversionLoading,
+  selectConvertedAmount,
+  selectExchangeRate,
+  setAmount,
+} from "../redux/slices/conversionSlice";
+import {
   clearError,
-  loadCurrencyPairs,
-  loadExchangeRate,
-  setDestinationCurrency,
-  setSourceCurrency,
+  fetchCurrencyPairs,
+  selectCurrencyError,
+  selectCurrencyLoading,
+  selectDestinationCurrencies,
+  selectSelectedDestination,
+  selectSelectedSource,
+  selectSourceCurrencies,
+  setSelectedDestination,
+  setSelectedSource,
   swapCurrencies,
 } from "../redux/slices/currencySlice";
-import { addConversion } from "../redux/slices/historySlice";
-import { AppDispatch, RootState } from "../redux/store";
-import { formatAmount } from "../utils/validators";
+import { AppDispatch } from "../redux/store";
 
-const MainScreen = ({ navigation }: any) => {
+export const MainScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const dispatch = useDispatch<AppDispatch>();
-  const {
-    pairs,
-    sourceCurrency,
-    destinationCurrency,
-    exchangeRate,
-    loading,
-    error,
-    isOffline,
-  } = useSelector((state: RootState) => state.currency);
+  const [isOnline, setIsOnline] = React.useState(true);
+  const [refreshing, setRefreshing] = React.useState(false);
 
-  const [amount, setAmount] = useState("");
-  const [convertedAmount, setConvertedAmount] = useState("");
-  const rotation = useSharedValue(0);
+  const sourceCurrencies = useSelector(selectSourceCurrencies);
+  const destinationCurrencies = useSelector(selectDestinationCurrencies);
+  const selectedSource = useSelector(selectSelectedSource);
+  const selectedDestination = useSelector(selectSelectedDestination);
+  const currencyLoading = useSelector(selectCurrencyLoading);
+  const currencyError = useSelector(selectCurrencyError);
+  const amount = useSelector(selectAmount);
+  const exchangeRate = useSelector(selectExchangeRate);
+  const convertedAmount = useSelector(selectConvertedAmount);
+  const conversionLoading = useSelector(selectConversionLoading);
+  const conversionError = useSelector(selectConversionError);
 
+  const swapRotation = useSharedValue(0);
+
+  // Network status listener
   useEffect(() => {
-    // Load currency pairs on mount
-    dispatch(loadCurrencyPairs());
-    dispatch(checkNetworkStatus());
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      setIsOnline(state.isConnected ?? false);
+    });
 
-    // Check network status periodically
-    const interval = setInterval(() => {
-      dispatch(checkNetworkStatus());
-    }, 5000);
-
-    return () => clearInterval(interval);
+    return () => unsubscribe();
   }, []);
 
+  // Fetch currency pairs on mount
   useEffect(() => {
-    // Fetch exchange rate when currencies change
-    if (sourceCurrency && destinationCurrency) {
+    if (sourceCurrencies.length === 0) {
+      dispatch(fetchCurrencyPairs());
+    }
+  }, [dispatch, sourceCurrencies.length]);
+
+  // Fetch exchange rate when currencies change
+  useEffect(() => {
+    if (selectedSource && selectedDestination && isOnline) {
       dispatch(
-        loadExchangeRate({
-          source: sourceCurrency,
-          destination: destinationCurrency,
+        fetchExchangeRate({
+          sourceCurrency: selectedSource.code,
+          destinationCurrency: selectedDestination.code,
         }),
       );
     }
-  }, [sourceCurrency, destinationCurrency]);
+  }, [dispatch, selectedSource, selectedDestination, isOnline]);
 
+  // Save to history when conversion completes
   useEffect(() => {
-    // Calculate conversion in real-time
-    if (amount && exchangeRate) {
-      const numAmount = parseFloat(amount);
-      const converted = numAmount * exchangeRate;
-      setConvertedAmount(formatAmount(converted));
-
-      // Save to history if valid amount
-      if (numAmount > 0) {
+    if (
+      convertedAmount !== null &&
+      selectedSource &&
+      selectedDestination &&
+      exchangeRate
+    ) {
+      const numericAmount = parseFloat(amount);
+      if (!isNaN(numericAmount) && numericAmount > 0) {
         dispatch(
-          addConversion({
-            amount: numAmount,
-            fromCurrency: sourceCurrency,
-            toCurrency: destinationCurrency,
-            convertedAmount: converted,
-            rate: exchangeRate,
-            timestamp: Date.now(),
+          addToHistory({
+            sourceCurrency: selectedSource.code,
+            destinationCurrency: selectedDestination.code,
+            amount: numericAmount,
+            result: convertedAmount,
+            rate: exchangeRate.rate,
           }),
         );
       }
-    } else {
-      setConvertedAmount("");
     }
-  }, [amount, exchangeRate]);
+  }, [convertedAmount]);
 
   const handleSwap = () => {
-    // Animate rotation
-    rotation.value = withSpring(rotation.value + 180);
-
-    // Swap currencies
+    swapRotation.value = withSpring(swapRotation.value + 180, {
+      damping: 20,
+      stiffness: 150,
+    });
     dispatch(swapCurrencies());
-
-    // Clear amounts
-    setAmount("");
-    setConvertedAmount("");
   };
 
-  const animatedStyle = useAnimatedStyle(() => {
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    if (selectedSource && selectedDestination) {
+      await dispatch(
+        fetchExchangeRate({
+          sourceCurrency: selectedSource.code,
+          destinationCurrency: selectedDestination.code,
+        }),
+      );
+    }
+    setRefreshing(false);
+  };
+
+  const handleRetryCurrency = () => {
+    dispatch(clearError());
+    dispatch(fetchCurrencyPairs());
+  };
+
+  const handleRetryExchangeRate = () => {
+    dispatch(clearConversionError());
+    if (selectedSource && selectedDestination) {
+      dispatch(
+        fetchExchangeRate({
+          sourceCurrency: selectedSource.code,
+          destinationCurrency: selectedDestination.code,
+        }),
+      );
+    }
+  };
+
+  const swapButtonStyle = useAnimatedStyle(() => {
     return {
-      transform: [{ rotate: `${rotation.value}deg` }],
+      transform: [{ rotate: `${swapRotation.value}deg` }],
     };
   });
 
-  const handleRetry = () => {
-    dispatch(clearError());
-    dispatch(loadCurrencyPairs());
-  };
+  const quickAmounts = [10, 50, 100, 500];
 
-  // Extract unique source currencies with null check
-  const sourceCurrencies =
-    pairs && pairs.length > 0
-      ? Array.from(new Set(pairs.map((p) => p.source_currency_code))).map(
-          (code) => {
-            const pair = pairs.find((p) => p.source_currency_code === code);
-            return {
-              code,
-              name: pair?.source_currency_name || code,
-            };
-          },
-        )
-      : [];
+  // Loading state
+  if (currencyLoading && sourceCurrencies.length === 0) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <LoadingSpinner size={60} />
+      </SafeAreaView>
+    );
+  }
 
-  // Extract destination currencies for selected source
-  const destinationCurrencies =
-    pairs && pairs.length > 0
-      ? pairs
-          .filter((p) => p.source_currency_code === sourceCurrency)
-          .map((p) => ({
-            code: p.destination_currency_code,
-            name: p.destination_currency_name,
-          }))
-      : [];
+  // Error state
+  if (currencyError && sourceCurrencies.length === 0) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ErrorView message={currencyError} onRetry={handleRetryCurrency} />
+      </SafeAreaView>
+    );
+  }
 
   return (
-    <View style={styles.container}>
-      {isOffline && (
-        <View style={styles.offlineBanner}>
-          <Text style={styles.offlineText}>
-            ⚠️ You're offline. Showing cached data.
+    <SafeAreaView style={styles.container}>
+      <OfflineBanner visible={!isOnline} />
+
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.title}>Currency Converter</Text>
+            <Text style={styles.subtitle}>Get live exchange rates</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.historyButton}
+            onPress={() => navigation.navigate("History")}
+            activeOpacity={0.8}
+          >
+            <MaterialIcons name="history" size={24} color="#3B82F6" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Status Badge */}
+        <View style={styles.statusBadge}>
+          <View
+            style={[styles.statusDot, isOnline && styles.statusDotOnline]}
+          />
+          <Text style={styles.statusText}>
+            {isOnline ? "Live rates" : "Offline mode"}
           </Text>
         </View>
-      )}
 
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Currency Converter</Text>
-
-        {error && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity
-              style={styles.retryButton}
-              onPress={handleRetry}
-              accessibilityLabel="Retry"
-            >
-              <Text style={styles.retryText}>Retry</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        <View style={styles.card}>
+        {/* Main Converter Card */}
+        <View style={styles.converterCard}>
+          {/* Source Currency */}
           <CurrencyDropdown
             label="From"
-            options={sourceCurrencies}
-            selectedValue={sourceCurrency}
-            onSelect={(value) => dispatch(setSourceCurrency(value))}
-          />
-
-          <ConversionInput
-            label="Amount"
-            value={amount}
-            onChangeText={setAmount}
-          />
-
-          <View style={styles.swapContainer}>
-            <TouchableOpacity
-              onPress={handleSwap}
-              style={styles.swapButton}
-              accessibilityLabel="Swap currencies"
-            >
-              <Animated.Text style={[styles.swapIcon, animatedStyle]}>
-                ⇅
-              </Animated.Text>
-            </TouchableOpacity>
-          </View>
-
-          <CurrencyDropdown
-            label="To"
-            options={destinationCurrencies}
-            selectedValue={destinationCurrency}
-            onSelect={(value) => dispatch(setDestinationCurrency(value))}
+            currencies={sourceCurrencies}
+            selectedCurrency={selectedSource}
+            onSelect={(currency) => dispatch(setSelectedSource(currency))}
             searchable
           />
 
-          <ConversionInput
-            label="Converted Amount"
-            value={convertedAmount}
-            onChangeText={() => {}}
-            editable={false}
+          {/* Swap Button */}
+          <View style={styles.swapContainer}>
+            <Animated.View style={swapButtonStyle}>
+              <TouchableOpacity
+                style={styles.swapButton}
+                onPress={handleSwap}
+                activeOpacity={0.8}
+              >
+                <MaterialIcons name="swap-vert" size={28} color="#3B82F6" />
+              </TouchableOpacity>
+            </Animated.View>
+          </View>
+
+          {/* Destination Currency */}
+          <CurrencyDropdown
+            label="To"
+            currencies={destinationCurrencies}
+            selectedCurrency={selectedDestination}
+            onSelect={(currency) => dispatch(setSelectedDestination(currency))}
+            searchable
           />
 
-          {exchangeRate && (
-            <View style={styles.rateContainer}>
-              <Text style={styles.rateText}>
-                1 {sourceCurrency} = {formatAmount(exchangeRate)}{" "}
-                {destinationCurrency}
-              </Text>
-            </View>
+          {/* Amount Input */}
+          <AmountInput
+            value={amount}
+            onChange={(value) => dispatch(setAmount(value))}
+            currencyCode={selectedSource?.code}
+            error={conversionError || undefined}
+          />
+
+          {/* Conversion Result */}
+          {selectedSource && selectedDestination && (
+            <>
+              {conversionError && !exchangeRate ? (
+                <View style={styles.errorContainer}>
+                  <MaterialIcons
+                    name="error-outline"
+                    size={24}
+                    color="#EF4444"
+                  />
+                  <Text style={styles.errorText}>{conversionError}</Text>
+                  <TouchableOpacity
+                    style={styles.retryButton}
+                    onPress={handleRetryExchangeRate}
+                  >
+                    <Text style={styles.retryText}>Retry</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <ConversionResult
+                  sourceCurrency={selectedSource.code}
+                  destinationCurrency={selectedDestination.code}
+                  amount={amount}
+                  convertedAmount={convertedAmount}
+                  exchangeRate={exchangeRate?.rate || null}
+                  loading={conversionLoading}
+                />
+              )}
+            </>
           )}
+
+          {/* Quick Amount Buttons */}
+          <View style={styles.quickAmountsContainer}>
+            <Text style={styles.quickAmountsLabel}>Quick amounts:</Text>
+            <View style={styles.quickAmountsButtons}>
+              {quickAmounts.map((quickAmount) => (
+                <TouchableOpacity
+                  key={quickAmount}
+                  style={styles.quickAmountButton}
+                  onPress={() => dispatch(setAmount(quickAmount.toString()))}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.quickAmountText}>{quickAmount}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
         </View>
 
-        <TouchableOpacity
-          style={styles.historyButton}
-          onPress={() => navigation.navigate("History")}
-          accessibilityLabel="View conversion history"
-        >
-          <Text style={styles.historyButtonText}>View History</Text>
-        </TouchableOpacity>
+        {/* Footer Info */}
+        <View style={styles.footer}>
+          <MaterialIcons name="verified-user" size={16} color="#10B981" />
+          <Text style={styles.footerText}>
+            Powered by real-time exchange rates
+          </Text>
+        </View>
       </ScrollView>
-
-      <LoadingSpinner visible={loading} />
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#F9FAFB",
   },
-  offlineBanner: {
-    backgroundColor: "#ff9800",
-    padding: 12,
+  scrollContent: {
+    padding: 20,
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-  },
-  offlineText: {
-    color: "white",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  content: {
-    padding: 16,
+    marginBottom: 16,
   },
   title: {
     fontSize: 28,
-    fontWeight: "bold",
-    marginBottom: 24,
-    color: "#333",
-    textAlign: "center",
+    fontWeight: "800",
+    color: "#111827",
+    letterSpacing: -0.5,
   },
-  card: {
-    backgroundColor: "white",
-    borderRadius: 12,
+  subtitle: {
+    fontSize: 14,
+    color: "#6B7280",
+    marginTop: 4,
+  },
+  historyButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#EFF6FF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  statusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginBottom: 20,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#F59E0B",
+  },
+  statusDotOnline: {
+    backgroundColor: "#10B981",
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#6B7280",
+  },
+  converterCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
     padding: 20,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowRadius: 12,
+    elevation: 4,
   },
   swapContainer: {
     alignItems: "center",
-    marginVertical: 16,
+    marginVertical: 8,
+    zIndex: 1,
   },
   swapButton: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: "#007AFF",
+    backgroundColor: "#EFF6FF",
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#007AFF",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    borderWidth: 3,
+    borderColor: "#FFFFFF",
+    shadowColor: "#3B82F6",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
     shadowRadius: 8,
-    elevation: 5,
+    elevation: 4,
   },
-  swapIcon: {
-    fontSize: 32,
-    color: "white",
-    fontWeight: "bold",
-  },
-  rateContainer: {
+  quickAmountsContainer: {
     marginTop: 16,
-    padding: 12,
-    backgroundColor: "#f0f9ff",
-    borderRadius: 8,
-    alignItems: "center",
+    marginBottom: 8,
   },
-  rateText: {
-    fontSize: 14,
-    color: "#0284c7",
+  quickAmountsLabel: {
+    fontSize: 12,
     fontWeight: "600",
+    color: "#6B7280",
+    marginBottom: 8,
+  },
+  quickAmountsButtons: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  quickAmountButton: {
+    flex: 1,
+    backgroundColor: "#F9FAFB",
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  quickAmountText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#374151",
   },
   errorContainer: {
-    backgroundColor: "#fee",
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 16,
-    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    padding: 20,
+    gap: 8,
   },
   errorText: {
-    color: "#c00",
     fontSize: 14,
-    flex: 1,
+    color: "#EF4444",
+    textAlign: "center",
   },
   retryButton: {
-    backgroundColor: "#c00",
-    paddingHorizontal: 16,
+    marginTop: 8,
+    paddingHorizontal: 20,
     paddingVertical: 8,
-    borderRadius: 6,
-    minWidth: 80,
-    minHeight: 44,
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: "#3B82F6",
+    borderRadius: 8,
   },
   retryText: {
-    color: "white",
+    color: "#FFFFFF",
     fontWeight: "600",
   },
-  historyButton: {
-    backgroundColor: "#007AFF",
-    padding: 16,
-    borderRadius: 8,
+  footer: {
+    flexDirection: "row",
     alignItems: "center",
-    marginTop: 24,
-    minHeight: 56,
     justifyContent: "center",
+    marginTop: 24,
+    gap: 6,
   },
-  historyButtonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "600",
+  footerText: {
+    fontSize: 12,
+    color: "#6B7280",
   },
 });
-
-export default MainScreen;

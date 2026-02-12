@@ -1,54 +1,23 @@
-import NetInfo from "@react-native-community/netinfo";
 import { createAsyncThunk, createSlice, PayloadAction } from "@reduxjs/toolkit";
-import { fetchCurrencyPairs, fetchExchangeRate } from "../../api/currencyApi";
-import { CurrencyState } from "../../types/currency.types";
+import { currencyApi } from "../../api/currencyApi";
+import { Currency, CurrencyState } from "../../types/currency";
+import type { RootState } from "../store";
 
 const initialState: CurrencyState = {
-  pairs: [],
-  sourceCurrency: "SGD",
-  destinationCurrency: "INR",
-  exchangeRate: null,
+  currencyPairs: [],
+  sourceCurrencies: [],
+  destinationCurrencies: [],
+  selectedSource: null,
+  selectedDestination: null,
   loading: false,
   error: null,
-  isOffline: false,
-  lastFetched: null,
 };
 
-// Fetch currency pairs
-export const loadCurrencyPairs = createAsyncThunk(
-  "currency/loadPairs",
-  async (_, { rejectWithValue }) => {
-    try {
-      const pairs = await fetchCurrencyPairs();
-      return pairs;
-    } catch (error) {
-      return rejectWithValue((error as Error).message);
-    }
-  },
-);
-
-// Fetch exchange rate
-export const loadExchangeRate = createAsyncThunk(
-  "currency/loadRate",
-  async (
-    { source, destination }: { source: string; destination: string },
-    { rejectWithValue },
-  ) => {
-    try {
-      const rate = await fetchExchangeRate(source, destination);
-      return rate;
-    } catch (error) {
-      return rejectWithValue((error as Error).message);
-    }
-  },
-);
-
-// Check network status
-export const checkNetworkStatus = createAsyncThunk(
-  "currency/checkNetwork",
+export const fetchCurrencyPairs = createAsyncThunk(
+  "currency/fetchPairs",
   async () => {
-    const state = await NetInfo.fetch();
-    return state.isConnected || false;
+    const pairs = await currencyApi.getCurrencyPairs();
+    return pairs;
   },
 );
 
@@ -56,16 +25,49 @@ const currencySlice = createSlice({
   name: "currency",
   initialState,
   reducers: {
-    setSourceCurrency: (state, action: PayloadAction<string>) => {
-      state.sourceCurrency = action.payload;
+    setSelectedSource: (state, action: PayloadAction<Currency>) => {
+      state.selectedSource = action.payload;
+
+      // Update destination currencies based on source
+      const validDestinations = state.currencyPairs
+        .filter((pair) => pair.source_currency_code === action.payload.code)
+        .map((pair) => ({
+          code: pair.destination_currency_code,
+          name: pair.destination_currency_name,
+        }));
+
+      state.destinationCurrencies = validDestinations;
+
+      // Reset destination if not valid
+      if (
+        !state.selectedDestination ||
+        !validDestinations.find(
+          (c) => c.code === state.selectedDestination?.code,
+        )
+      ) {
+        state.selectedDestination = validDestinations[0] || null;
+      }
     },
-    setDestinationCurrency: (state, action: PayloadAction<string>) => {
-      state.destinationCurrency = action.payload;
+    setSelectedDestination: (state, action: PayloadAction<Currency>) => {
+      state.selectedDestination = action.payload;
     },
     swapCurrencies: (state) => {
-      const temp = state.sourceCurrency;
-      state.sourceCurrency = state.destinationCurrency;
-      state.destinationCurrency = temp;
+      if (state.selectedSource && state.selectedDestination) {
+        const temp = state.selectedSource;
+        state.selectedSource = state.selectedDestination;
+        state.selectedDestination = temp;
+
+        // Update destination currencies
+        const validDestinations = state.currencyPairs
+          .filter(
+            (pair) => pair.source_currency_code === state.selectedSource!.code,
+          )
+          .map((pair) => ({
+            code: pair.destination_currency_code,
+            name: pair.destination_currency_name,
+          }));
+        state.destinationCurrencies = validDestinations;
+      }
     },
     clearError: (state) => {
       state.error = null;
@@ -73,45 +75,79 @@ const currencySlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // Load currency pairs
-      .addCase(loadCurrencyPairs.pending, (state) => {
+      .addCase(fetchCurrencyPairs.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(loadCurrencyPairs.fulfilled, (state, action) => {
+      .addCase(fetchCurrencyPairs.fulfilled, (state, action) => {
         state.loading = false;
-        state.pairs = action.payload;
-        state.lastFetched = Date.now();
+        state.currencyPairs = action.payload;
+
+        // Extract unique source currencies
+        const sources = Array.from(
+          new Set(action.payload.map((pair) => pair.source_currency_code)),
+        ).map((code) => {
+          const pair = action.payload.find(
+            (p) => p.source_currency_code === code,
+          );
+          return {
+            code,
+            name: pair?.source_currency_name || code,
+          };
+        });
+
+        state.sourceCurrencies = sources;
+
+        // Set default selections
+        if (!state.selectedSource && sources.length > 0) {
+          state.selectedSource =
+            sources.find((c) => c.code === "SGD") || sources[0];
+        }
+
+        // Set destination currencies
+        if (state.selectedSource) {
+          const destinations = action.payload
+            .filter(
+              (pair) =>
+                pair.source_currency_code === state.selectedSource!.code,
+            )
+            .map((pair) => ({
+              code: pair.destination_currency_code,
+              name: pair.destination_currency_name,
+            }));
+          state.destinationCurrencies = destinations;
+
+          if (!state.selectedDestination && destinations.length > 0) {
+            state.selectedDestination =
+              destinations.find((c) => c.code === "USD") || destinations[0];
+          }
+        }
       })
-      .addCase(loadCurrencyPairs.rejected, (state, action) => {
+      .addCase(fetchCurrencyPairs.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
-      })
-      // Load exchange rate
-      .addCase(loadExchangeRate.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(loadExchangeRate.fulfilled, (state, action) => {
-        state.loading = false;
-        state.exchangeRate = action.payload;
-      })
-      .addCase(loadExchangeRate.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload as string;
-      })
-      // Check network status
-      .addCase(checkNetworkStatus.fulfilled, (state, action) => {
-        state.isOffline = !action.payload;
+        state.error = action.error.message || "Failed to fetch currency pairs";
       });
   },
 });
 
 export const {
-  setSourceCurrency,
-  setDestinationCurrency,
+  setSelectedSource,
+  setSelectedDestination,
   swapCurrencies,
   clearError,
 } = currencySlice.actions;
+
+// Selectors
+export const selectSourceCurrencies = (state: RootState) =>
+  state.currency.sourceCurrencies;
+export const selectDestinationCurrencies = (state: RootState) =>
+  state.currency.destinationCurrencies;
+export const selectSelectedSource = (state: RootState) =>
+  state.currency.selectedSource;
+export const selectSelectedDestination = (state: RootState) =>
+  state.currency.selectedDestination;
+export const selectCurrencyLoading = (state: RootState) =>
+  state.currency.loading;
+export const selectCurrencyError = (state: RootState) => state.currency.error;
 
 export default currencySlice.reducer;

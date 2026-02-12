@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
-import { ConversionHistory, HistoryState } from "../../types/currency.types";
+import { ConversionHistory, HistoryState } from "../../types/currency";
 
 const initialState: HistoryState = {
   conversions: [],
