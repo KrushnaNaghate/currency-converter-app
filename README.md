@@ -1,88 +1,247 @@
-# 💱 Currency Converter - React Native Mobile App
+# Currency Converter - React Native
 
-> **Assignment Submission** - Professional currency converter app demonstrating React Native, TypeScript, Redux Toolkit, and modern mobile development best practices.
-
-![Tests](https://img.shields.io/badge/tests-26%20passing-brightgreen)
-![TypeScript](https://img.shields.io/badge/TypeScript-100%25-blue)
-![Platform](https://img.shields.io/badge/platform-iOS%20%7C%20Android-lightgrey)
+A professional currency converter app built with Expo, TypeScript, Redux Toolkit, and React Native Testing Library.
 
 ---
 
-## 📋 Table of Contents
-
-- [Features](#-features)
-- [Tech Stack](#-tech-stack)
-- [Installation & Setup](#️-installation--setup)
-- [Running the App](#-running-the-app)
-- [Testing](#-testing)
-- [Project Structure](#-project-structure)
-- [Architecture & Approach](#-architecture--approach)
-- [API Integration](#-api-integration)
-- [State Management](#-state-management)
-- [Assumptions Made](#-assumptions-made)
-- [Dependencies](#-dependencies)
-- [Troubleshooting](#-troubleshooting)
-- [Submission Details](#-submission-details)
-
----
-
-## ✨ Features
-
-### Core Features (Required)
-- ✅ **Real-time Currency Conversion** - 10 major currencies with live exchange rates
-- ✅ **Two Screen Navigation** - Main converter + History screen
-- ✅ **Searchable Currency Dropdowns** - Filter by code or name
-- ✅ **Country Flags** - Emoji flags for all currencies
-- ✅ **Swap Button** - Instant source ↔ destination swap
-- ✅ **Conversion History** - Last 10 conversions persisted
-- ✅ **Offline Support** - Works offline with cached rates + warning banner
-- ✅ **Input Validation** - Numeric only with decimal support
-- ✅ **Error Handling** - User-friendly messages + retry buttons
-- ✅ **Loading States** - Smooth animated spinners
-- ✅ **Redux Toolkit** - Complete state management
-- ✅ **Redux Persist** - History + rates cached across restarts
-- ✅ **TypeScript** - 100% type coverage with strict mode
-- ✅ **Unit Tests** - 26 passing tests (Jest + RNTL)
-- ✅ **Accessibility** - Screen reader labels + proper touch targets
-
-### Bonus Features
-- ✅ **React Native Reanimated** - 60fps animations (swap button, fade-ins)
-- ✅ **Pull to Refresh** - Update exchange rates
-- ✅ **Quick Amount Buttons** - Tap 10/50/100/500 for fast conversion
-
----
-
-## 🛠️ Tech Stack
-
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| **Expo** | SDK 54 | React Native development platform |
-| **React Native** | 0.81.5 | Mobile UI framework |
-| **TypeScript** | 5.9.2 | Type safety |
-| **Redux Toolkit** | 2.11.2 | State management |
-| **Redux Persist** | 6.0.0 | State persistence (AsyncStorage) |
-| **React Navigation** | 7.x | Screen navigation |
-| **React Native Reanimated** | 4.1.1 | Smooth 60fps animations |
-| **Axios** | 1.13.5 | HTTP client for API calls |
-| **NetInfo** | 11.4.1 | Network connectivity detection |
-| **Jest** | (via jest-expo) | Testing framework |
-| **React Native Testing Library** | 13.3.3 | Component testing utilities |
-| **@expo/vector-icons** | (via Expo) | Material Design icons |
-
----
-
-## 🚀 Installation & Setup
+## 📋 Setup Instructions
 
 ### Prerequisites
+- Node.js 20
+- npm or yarn
+- Android Studio (for Android) or Xcode (for iOS, Mac only)
 
-Before you begin, ensure you have:
-- **Node.js** 18.0+ ([Download](https://nodejs.org/))
-- **npm** or **yarn**
-- **Git**
-- **iOS Simulator** (Mac only) or **Android Emulator**
+### Installation
 
-### Step 1: Clone the Repository
-
+1. Clone the repository:
 ```bash
-git clone <your-github-repo-url>
+git clone <your-repo-url>
 cd CurrencyConverter
+```
+
+2. Install dependencies:
+```bash
+npm install
+```
+
+---
+
+## 🚀 Running the App
+
+Start the development server:
+```bash
+npm start
+```
+
+Run on Android:
+```bash
+npm run android
+```
+
+Run on iOS (Mac only):
+```bash
+npm run ios
+```
+
+---
+
+## 🧪 Testing
+
+This project includes unit tests for:
+
+- **Component:** AmountInput (9 tests)
+- **Redux Slices:** currencySlice (7 tests), conversionSlice (10 tests)
+
+Run all tests:
+```bash
+npm test
+```
+
+Run tests in watch mode:
+```bash
+npm run test:watch
+```
+
+Run tests with coverage:
+```bash
+npm run test:coverage
+```
+
+Expected output:
+```
+Test Suites: 3 passed, 3 total
+Tests:       26 passed, 26 total
+```
+
+---
+
+## 📁 Project Structure
+
+```
+src/
+├── api/                    # API integration (currencyApi.ts)
+├── components/             # Reusable UI components
+│   ├── AmountInput.tsx
+│   ├── ConversionResult.tsx
+│   ├── CurrencyDropdown.tsx
+│   └── __tests__/          # Component tests
+├── screens/                # Screen components
+│   ├── MainScreen.tsx
+│   └── HistoryScreen.tsx
+├── redux/                  # Redux state management
+│   ├── store.ts
+│   └── slices/
+│       ├── currencySlice.ts
+│       ├── conversionSlice.ts
+│       └── __tests__/      # Redux slice tests
+├── navigation/             # React Navigation setup
+├── utils/                  # Helper functions
+└── types/                  # TypeScript type definitions
+```
+
+---
+
+## 🏗️ Approach & Architecture
+
+### State Management
+- **Redux Toolkit** for centralized state management
+- **Redux Persist** to cache last 10 conversions and exchange rates
+- Two main slices:
+  - `currencySlice`: Manages currency pairs and selections
+  - `conversionSlice`: Handles conversion logic and history
+
+### API Integration
+- Free exchange rate API (Open Exchange Rates)
+- Cached rates to reduce API calls and enable offline mode
+- Graceful error handling with retry mechanisms
+
+### UI/UX
+- React Navigation for screen transitions
+- React Native Reanimated for smooth 60fps animations
+- Offline detection with warning banner
+- Loading spinners and error messages
+
+### Testing Strategy
+- Jest + React Native Testing Library
+- Unit tests for business logic (Redux) and UI (components)
+- Mock external dependencies (APIs, AsyncStorage, NetInfo)
+
+---
+
+## 📝 Assumptions Made
+
+- **Currency List:** Used 10 major currencies (USD, EUR, GBP, JPY, CAD, AUD, HKD, MYR, SGD, INR) as the original API endpoint returns empty data.
+- **History Limit:** Only last 10 conversions are stored to prevent unlimited storage growth.
+- **Rate Caching:** Exchange rates are cached for 5 minutes to reduce API calls and support offline usage.
+- **Offline Behavior:** When offline, app uses last cached rate. If no cache exists, shows error message.
+- **Decimal Precision:** Exchange rates shown with 4 decimals, converted amounts with 2 decimals.
+- **Flags:** Using emoji flags instead of image assets for simplicity and universal compatibility.
+
+---
+
+## 📦 Dependencies (with versions)
+
+### Production Dependencies
+
+| Package | Version |
+|---------|---------|
+| expo | ~54.0.33 |
+| react | 19.1.0 |
+| react-native | 0.81.5 |
+| @reduxjs/toolkit | ^2.11.2 |
+| redux-persist | ^6.0.0 |
+| react-redux | ^9.2.0 |
+| @react-navigation/native | ^7.1.28 |
+| @react-navigation/native-stack | ^7.12.0 |
+| react-native-reanimated | ~4.1.1 |
+| @react-native-async-storage/async-storage | 2.2.0 |
+| @react-native-community/netinfo | 11.4.1 |
+| axios | ^1.13.5 |
+| expo-asset | ~13.0.0 |
+
+### Dev Dependencies
+
+| Package | Version |
+|---------|---------|
+| typescript | ~5.9.2 |
+| @testing-library/react-native | ^13.3.3 |
+| @testing-library/jest-native | ^5.4.3 |
+| jest-expo | ^54.0.17 |
+| @types/react | ~19.1.0 |
+| @types/jest | ^30.0.0 |
+
+To see exact installed versions:
+```bash
+npm ls --depth=0
+```
+
+---
+
+## 🌐 Platform Compatibility
+
+This app is built with Expo managed workflow and is fully compatible with:
+
+- ✅ **Android** (tested on Android 13+ emulator)
+- ✅ **iOS** (tested on iOS 16+ simulator)
+
+---
+
+## 🐛 Troubleshooting
+
+**Tests failing?**
+```bash
+npx jest --clearCache
+npm test
+```
+
+**Metro bundler stuck?**
+```bash
+npm start -- --clear
+```
+
+**TypeScript errors?**
+```bash
+npx tsc --noEmit
+```
+
+---
+
+## 📤 Submission
+
+### GitHub Repository
+[Your GitHub URL]
+
+### ZIP Archive
+[Your Google Drive URL]
+
+**How to create ZIP:**
+```bash
+git archive -o CurrencyConverter.zip HEAD
+```
+Upload to Google Drive → Share → "Anyone with the link"
+
+---
+
+## ✅ Requirements Met
+
+- ✅ Clear folder structure (components/, screens/, redux/, api/, utils/)
+- ✅ GitHub repository with complete code
+- ✅ README with setup, run, test instructions
+- ✅ Approach and assumptions documented
+- ✅ Dependencies listed with versions
+- ✅ Unit tests (26 passing)
+- ✅ TypeScript strict mode
+- ✅ Redux Toolkit + Redux Persist
+- ✅ Offline support
+- ✅ iOS & Android compatible
+- ✅ Accessibility support
+- ✅ React Native Reanimated
+
+---
+
+**Developed by:** Krushna Naghate
+**Date:** February 2026
+
+
+
+
