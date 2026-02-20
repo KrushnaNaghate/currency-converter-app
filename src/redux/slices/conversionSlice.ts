@@ -1,3 +1,5 @@
+//? amount input, exchange rate fetching, rate caching, and history management
+
 import { createAsyncThunk, createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { currencyApi } from "../../api/currencyApi";
 import { ConversionHistory, ConversionState } from "../../types/currency";
@@ -12,6 +14,8 @@ const initialState: ConversionState = {
   error: null,
   cachedRates: {},
 };
+
+//? cache ex.  "USD-INR": { rate: 83.45, timestamp: 1708455600000 },
 
 export const fetchExchangeRate = createAsyncThunk(
   "conversion/fetchRate",

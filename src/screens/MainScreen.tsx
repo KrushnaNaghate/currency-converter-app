@@ -78,6 +78,7 @@ export const MainScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
   // Fetch currency pairs on mount
   useEffect(() => {
+    //prevent re-fetching
     if (sourceCurrencies.length === 0) {
       dispatch(fetchCurrencyPairs());
     }

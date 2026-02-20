@@ -95,17 +95,19 @@ const currencySlice = createSlice({
             name: pair?.source_currency_name || code,
           };
         });
-
+        //SOUCE dropdown options
         state.sourceCurrencies = sources;
 
         // Set default selections
         if (!state.selectedSource && sources.length > 0) {
+          //source dropdown value set
           state.selectedSource =
             sources.find((c) => c.code === "SGD") || sources[0];
         }
 
         // Set destination currencies
         if (state.selectedSource) {
+          //find pairs with selected source and map to destination dropdown options
           const destinations = action.payload
             .filter(
               (pair) =>
@@ -116,7 +118,7 @@ const currencySlice = createSlice({
               name: pair.destination_currency_name,
             }));
           state.destinationCurrencies = destinations;
-
+          //cehck usd or Set first destination if usd not found
           if (!state.selectedDestination && destinations.length > 0) {
             state.selectedDestination =
               destinations.find((c) => c.code === "USD") || destinations[0];
