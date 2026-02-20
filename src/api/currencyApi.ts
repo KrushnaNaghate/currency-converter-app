@@ -3,7 +3,7 @@ import { CurrencyPair, ExchangeRate } from "../types/currency";
 
 const EXCHANGE_API_BASE = "https://open.er-api.com/v6/latest";
 
-// Mock currency pairs (since Instarem API doesn't provide them)
+// Mock currency pairs
 const generateCurrencyPairs = (): CurrencyPair[] => {
   const currencies = [
     { code: "USD", name: "US Dollar" },
@@ -54,9 +54,9 @@ export const currencyApi = {
       if (response.data?.rates && response.data.rates[destinationCurrency]) {
         const rate = response.data.rates[destinationCurrency];
         return {
-          source_currency: sourceCurrency,
-          destination_currency: destinationCurrency,
-          rate: rate,
+          source_currency: sourceCurrency, //USD
+          destination_currency: destinationCurrency, //EUR
+          rate: rate, // 0.92
           date: new Date().toISOString(),
         };
       }

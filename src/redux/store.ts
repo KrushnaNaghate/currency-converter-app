@@ -14,6 +14,7 @@ import {
 import conversionReducer from "./slices/conversionSlice";
 import currencyReducer from "./slices/currencySlice";
 
+//configured redux store with persistence for currency pairs and conversion history.
 const currencyPersistConfig = {
   key: "currency",
   storage: AsyncStorage,
@@ -25,6 +26,8 @@ const conversionPersistConfig = {
   storage: AsyncStorage,
   whitelist: ["history", "cachedRates"],
 };
+// currency slice: currency pairs and selections are persisted.
+// conversion slice: amount, last rate, and history are persisted
 
 const rootReducer = combineReducers({
   currency: persistReducer(currencyPersistConfig, currencyReducer),
@@ -40,6 +43,11 @@ export const store = configureStore({
       },
     }),
 });
+//! flush for Forces all pending state writes to storage immediately.
+//! rehydrate for Triggered when persisted state is loaded from AsyncStorage and merged back.
+//! PAUSE for Temporarily stops persistence.
+//! PERSIST for Starts persistence.
+//! PURGE for Deletes persisted storage completely.
 
 export const persistor = persistStore(store);
 
